@@ -1,307 +1,174 @@
+/******************************************************
+ * BACKEND.JS
+ *
+ * This file implements the classes and associations 
+ * from the airline-booking UML diagram. 
+ ******************************************************/
 
-const express = require("express");
-const mongoose = require("mongoose");
-
-
-const CONNECTION_STRING =
-  "mongodb+srv://aurafat24:aurafat24@cluster0.2ddxq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-
-mongoose
-  .connect(CONNECTION_STRING, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-    // useCreateIndex, useFindAndModify no longer needed in Mongoose 6+
-  })
-  .then(() => {
-    console.log("Connected to MongoDB!");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
-
-// 2) Define Schemas & Models
-
-//-------------------- Seat
-const SeatSchema = new mongoose.Schema({
-  seatNumber: { type: String, required: true },
-  class: { type: String, required: true }, // e.g. "Economy", "Business"
-  isOccupied: { type: Boolean, default: false },
-});
-
-//-------------------- Flight
-const FlightSchema = new mongoose.Schema({
-  flightNumber: { type: String, required: true },
-  departureTime: { type: Date, required: true },
-  arrivalTime: { type: Date, required: true },
-  origin: { type: String, required: true },
-  destination: { type: String, required: true },
-  price: { type: Number, required: true },
-  airline: { type: String, required: true },
-  availableSeats: [SeatSchema],
-});
-const Flight = mongoose.model("Flight", FlightSchema);
-
-//-------------------- LoyaltyProgram
-const LoyaltyProgramSchema = new mongoose.Schema({
-  programId: { type: String, required: true },
-  programName: { type: String, required: true },
-  pointsPerDollar: { type: Number, required: true },
-  tier: { type: String, required: true }, // e.g. "Silver", "Gold"
-  active: { type: String, default: "Yes" },
-  validTill: { type: Date, required: true },
-});
-const LoyaltyProgram = mongoose.model("LoyaltyProgram", LoyaltyProgramSchema);
-
-//-------------------- Customer
-const CustomerSchema = new mongoose.Schema({
-  id: { type: String, required: true },
-  loyaltyPoints: { type: Number, default: 0 },
-  loyaltyProgram: LoyaltyProgramSchema,
-  bookings: [{ type: mongoose.Schema.Types.ObjectId, ref: "Booking" }],
-});
-const Customer = mongoose.model("Customer", CustomerSchema);
-
-//-------------------- Meal
-const MealSchema = new mongoose.Schema({
-  mealType: { type: String, required: true },
-});
-
-//-------------------- SpecialRequest
-const SpecialRequestSchema = new mongoose.Schema({
-  requestType: { type: String, required: true },
-  note: { type: String },
-  status: { type: String, default: "Pending" },
-});
-
-//-------------------- Payment
-const PaymentSchema = new mongoose.Schema({
-  paymentId: { type: String, required: true },
-  amount: { type: Number, required: true },
-  status: { type: String, default: "Pending" },
-  method: { type: String, required: true },
-  transactionId: { type: String, required: true },
-});
-
-//-------------------- Booking
-const BookingSchema = new mongoose.Schema({
-  bookingId: { type: String, required: true },
-  customer: { type: mongoose.Schema.Types.ObjectId, ref: "Customer" },
-  flights: [{ type: mongoose.Schema.Types.ObjectId, ref: "Flight" }],
-  bookingDate: { type: Date, default: Date.now },
-  status: { type: String, default: "Confirmed" },
-  meals: [MealSchema],
-  specialRequests: [SpecialRequestSchema],
-  paymentInfo: PaymentSchema,
-});
-const Booking = mongoose.model("Booking", BookingSchema);
-
-//-------------------- Ticket
-const TicketSchema = new mongoose.Schema({
-  ticketId: { type: String, required: true },
-  boardingPassUrl: { type: String },
-  booking: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
-});
-const Ticket = mongoose.model("Ticket", TicketSchema);
-
-//-------------------- User
-const UserSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
-  name: String,
-  email: String,
-  password: String,
-});
-const User = mongoose.model("User", UserSchema);
-
-//-------------------- Admin (pseudo-"extends" User)
-const AdminSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  flights: [{ type: mongoose.Schema.Types.ObjectId, ref: "Flight" }],
-  d: String,
-});
-const Admin = mongoose.model("Admin", AdminSchema);
-
-// 3) Set up Express App
-const app = express();
-app.use(express.json()); // parse JSON bodies
-
-// 4) Example Routes for each entity
-//----------------------------------
-// FLIGHTS
-//----------------------------------
-app.get("/api/flights", async (req, res) => {
-  try {
-    const flights = await Flight.find();
-    res.json(flights);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// ================ CLASS: User ==================
+class User {
+  constructor(userId, name, email, password) {
+    this.userId = userId;
+    this.name = name;
+    this.email = email;
+    this.password = password;
   }
-});
+}
 
-app.post("/api/flights", async (req, res) => {
-  try {
-    const newFlight = await Flight.create(req.body);
-    res.json(newFlight);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+// ================ CLASS: Admin =================
+// (Admin is conceptually a specialized User)
+class Admin extends User {
+  constructor(userId, name, email, password) {
+    super(userId, name, email, password);
+
+    // The diagram shows that an Admin can manage flights and loyalty programs
+    // We'll store them in arrays:
+    this.flights = [];
+    this.loyaltyPrograms = [];
   }
-});
 
-app.get("/api/flights/:id", async (req, res) => {
-  try {
-    const flight = await Flight.findById(req.params.id);
-    if (!flight) {
-      return res.status(404).json({ error: "Flight not found" });
-    }
-    res.json(flight);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  manageFlights(flights) {
+    // For simplicity, this method replaces the entire flights array
+    this.flights = flights;
   }
-});
 
-app.put("/api/flights/:id", async (req, res) => {
-  try {
-    const updatedFlight = await Flight.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-    if (!updatedFlight) {
-      return res.status(404).json({ error: "Flight not found" });
-    }
-    res.json(updatedFlight);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  manageLoyaltyPrograms(loyaltyPrograms) {
+    // Similarly, replace the entire loyaltyPrograms array
+    this.loyaltyPrograms = loyaltyPrograms;
   }
-});
+}
 
-app.delete("/api/flights/:id", async (req, res) => {
-  try {
-    const deletedFlight = await Flight.findByIdAndDelete(req.params.id);
-    if (!deletedFlight) {
-      return res.status(404).json({ error: "Flight not found" });
-    }
-    res.json({ message: "Flight deleted" });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+// ================ CLASS: LoyaltyProgram =================
+class LoyaltyProgram {
+  constructor(programId, programName, pointsPerDollar, tier, active, validTill) {
+    this.programId = programId;
+    this.programName = programName;
+    this.pointsPerDollar = pointsPerDollar;
+    this.tier = tier;           // e.g. Silver/Gold/Platinum
+    this.active = active;       // e.g. "Yes"/"No" or boolean
+    this.validTill = validTill; // a Date or date-time string
   }
-});
+}
 
-//----------------------------------
-// CUSTOMERS
-//----------------------------------
-app.get("/api/customers", async (req, res) => {
-  try {
-    // optionally populate bookings
-    const customers = await Customer.find().populate("bookings");
-    res.json(customers);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// ================ CLASS: Customer ==================
+// (Customer is also conceptually a specialized User)
+class Customer extends User {
+  constructor(userId, name, email, password, loyaltyPoints = 0, loyaltyProgram = null) {
+    super(userId, name, email, password);
+    this.loyaltyPoints = loyaltyPoints;
+    this.loyaltyProgram = loyaltyProgram;  // single LoyaltyProgram
+    this.bookings = [];                    // array of Booking objects
   }
-});
 
-app.post("/api/customers", async (req, res) => {
-  try {
-    const newCustomer = await Customer.create(req.body);
-    res.json(newCustomer);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  addBooking(booking) {
+    this.bookings.push(booking);
   }
-});
+}
 
-//----------------------------------
-// BOOKINGS
-//----------------------------------
-app.get("/api/bookings", async (req, res) => {
-  try {
-    const bookings = await Booking.find()
-      .populate("customer")
-      .populate("flights");
-    res.json(bookings);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// ================ CLASS: Seat ==================
+class Seat {
+  constructor(seatNumber, seatClass, isOccupied = false) {
+    this.seatNumber = seatNumber;
+    this.class = seatClass;     // e.g. "Economy", "Business", "First"
+    this.isOccupied = isOccupied;
   }
-});
+}
 
-app.post("/api/bookings", async (req, res) => {
-  try {
-    const newBooking = await Booking.create(req.body);
+// ================ CLASS: Flight ==================
+class Flight {
+  constructor(flightNumber, departureTime, arrivalTime, origin, destination, price, airline) {
+    this.flightNumber = flightNumber;
+    this.departureTime = departureTime;  // Date or string
+    this.arrivalTime = arrivalTime;      // Date or string
+    this.origin = origin;
+    this.destination = destination;
+    this.price = price;
+    this.airline = airline;
 
-    // link booking to the customer
-    if (newBooking.customer) {
-      await Customer.findByIdAndUpdate(newBooking.customer, {
-        $push: { bookings: newBooking._id },
-      });
-    }
-
-    res.json(newBooking);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    // Diagram shows flight has an array of seats
+    this.availableSeats = [];
   }
-});
 
-//----------------------------------
-// TICKETS
-//----------------------------------
-app.get("/api/tickets", async (req, res) => {
-  try {
-    const tickets = await Ticket.find().populate("booking");
-    res.json(tickets);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  addSeat(seat) {
+    this.availableSeats.push(seat);
   }
-});
+}
 
-app.post("/api/tickets", async (req, res) => {
-  try {
-    const newTicket = await Ticket.create(req.body);
-    res.json(newTicket);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+// ================ CLASS: Meal ==================
+class Meal {
+  constructor(mealType) {
+    this.mealType = mealType; // e.g. "Vegetarian", "Standard", etc.
   }
-});
+}
 
-//----------------------------------
-// USERS / ADMINS
-//----------------------------------
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// ================ CLASS: SpecialRequest ==================
+class SpecialRequest {
+  constructor(requestType, note, status) {
+    this.requestType = requestType;  // e.g. "Wheelchair", "Extra Luggage"
+    this.note = note;
+    this.status = status;            // e.g. "Pending", "Approved", "Denied"
   }
-});
+}
 
-app.post("/api/users", async (req, res) => {
-  try {
-    const newUser = await User.create(req.body);
-    res.json(newUser);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+// ================ CLASS: Payment ==================
+class Payment {
+  constructor(paymentId, amount, status, method, transactionId) {
+    this.paymentId = paymentId;
+    this.amount = amount;
+    this.status = status;     // e.g. "Completed", "Pending"
+    this.method = method;     // e.g. "CreditCard", "PayPal"
+    this.transactionId = transactionId;
   }
-});
+}
 
-// Admins
-app.get("/api/admins", async (req, res) => {
-  try {
-    const admins = await Admin.find().populate("user").populate("flights");
-    res.json(admins);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// ================ CLASS: Booking ==================
+class Booking {
+  constructor(bookingId, customer, bookingDate, status, paymentInfo = null) {
+    this.bookingId = bookingId;
+    this.customer = customer;        // one Customer
+    this.bookingDate = bookingDate;  // Date or string
+    this.status = status;            // e.g. "Confirmed", "Cancelled"
+    this.paymentInfo = paymentInfo;  // one Payment
+
+    // Diagram shows a booking can include multiple flights, meals, special requests
+    this.flights = [];
+    this.meals = [];
+    this.specialRequests = [];
   }
-});
 
-app.post("/api/admins", async (req, res) => {
-  try {
-    const newAdmin = await Admin.create(req.body);
-    res.json(newAdmin);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  addFlight(flight) {
+    this.flights.push(flight);
   }
-});
 
-// 5) Start Server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  addMeal(meal) {
+    this.meals.push(meal);
+  }
+
+  addSpecialRequest(specialRequest) {
+    this.specialRequests.push(specialRequest);
+  }
+}
+
+// ================ CLASS: Ticket ==================
+class Ticket {
+  constructor(ticketId, boardingPassUrl, booking) {
+    this.ticketId = ticketId;
+    this.boardingPassUrl = boardingPassUrl;
+    this.booking = booking; // references a Booking
+  }
+}
+
+// Export all classes so we can require() them in client.js
+module.exports = {
+  User,
+  Admin,
+  Customer,
+  Flight,
+  Seat,
+  Booking,
+  Ticket,
+  Meal,
+  SpecialRequest,
+  Payment,
+  LoyaltyProgram
+};
