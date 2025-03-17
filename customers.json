@@ -1,0 +1,17 @@
+[
+  {
+    "userId": "cust1741835670537",
+    "name": "Rafat",
+    "email": "rafat@concordia.com",
+    "password": "rafat123",
+    "loyaltyPoints": 0,
+    "loyaltyProgram": null,
+    "bookings": [
+      "FL001",
+      {
+        "flightNumber": "E6009",
+        "seatNumber": "A1"
+      }
+    ]
+  }
+]
