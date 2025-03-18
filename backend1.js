@@ -329,6 +329,13 @@ app.post('/admin/:adminId/manageLoyaltyPrograms', (req, res) => {
   });
 });
 
+// GET /flights - Retrieve all flights
+app.get('/flights', (req, res) => {
+  const flightData = loadJSON('flights.json');
+  res.json(flightData);
+});
+
+
 // ----------------------------------------------------------------------
 // EXAMPLE: Flight and LoyaltyProgram Endpoints (CRUD-like)
 // ----------------------------------------------------------------------
