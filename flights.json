@@ -10,67 +10,6 @@
     "availableSeats": []
   },
   {
-    "flightNumber": "q",
-    "departureTime": "qqq",
-    "arrivalTime": "qqq",
-    "origin": "q",
-    "destination": "q",
-    "price": null,
-    "airline": "q",
-    "availableSeats": [
-      {
-        "seatNumber": "a",
-        "class": "economy",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "1",
-        "class": "b",
-        "isOccupied": true
-      },
-      {
-        "seatNumber": "a",
-        "class": "3",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "s",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "s",
-        "isOccupied": false
-      },
-      {
-        "seatNumber": "s",
-        "class": "s",
-        "isOccupied": false
-      }
-    ]
-  },
-  {
     "flightNumber": "F8291",
     "departureTime": "2025-06-01T10:00:00",
     "arrivalTime": "2025-06-01T10:23:00",

@@ -534,6 +534,130 @@ app.post('/customer/:customerId/bookFlight', (req, res) => {
     flight,
   });
 });
+
+/**
+ * ===============================
+ * NEW: EDIT AN EXISTING FLIGHT
+ * ===============================
+ */
+app.put('/flights/:flightNumber', (req, res) => {
+  const { flightNumber } = req.params;
+  const {
+    newFlightNumber,
+    departureTime,
+    arrivalTime,
+    origin,
+    destination,
+    price,
+    airline,
+    availableSeats
+  } = req.body;
+
+  const flightData = loadJSON('flights.json');
+  const flightIndex = flightData.findIndex(f => f.flightNumber === flightNumber);
+
+  if (flightIndex === -1) {
+    return res.status(404).json({ message: 'Flight not found.' });
+  }
+
+  // If user wants to update the flight number, check uniqueness
+  if (newFlightNumber && newFlightNumber.trim() !== flightNumber) {
+    const flightExists = flightData.some(
+      f => f.flightNumber === newFlightNumber.trim() && f.flightNumber !== flightNumber
+    );
+    if (flightExists) {
+      return res
+        .status(400)
+        .json({ message: 'Cannot change to this flightNumber, it already exists.' });
+    }
+  }
+
+  // Validate departure/arrival times if present
+  if (departureTime && arrivalTime) {
+    const depTime = new Date(departureTime);
+    const arrTime = new Date(arrivalTime);
+    if (depTime >= arrTime) {
+      return res
+        .status(400)
+        .json({ message: 'Flight departure time must be before arrival time.' });
+    }
+  }
+
+  // Validate seats if user provided them
+  if (availableSeats && Array.isArray(availableSeats)) {
+    // Check for duplicate seat numbers
+    const seatNumbers = availableSeats.map(seat => seat.seatNumber);
+    const uniqueSeatNumbers = new Set(seatNumbers);
+    if (uniqueSeatNumbers.size !== seatNumbers.length) {
+      return res
+        .status(400)
+        .json({ message: 'Duplicate seats are not allowed in a flight.' });
+    }
+    // Ensure each seat has a valid Boolean for isOccupied
+    availableSeats.forEach(seat => {
+      if (typeof seat.isOccupied !== 'boolean') {
+        seat.isOccupied = false;
+      }
+    });
+  }
+
+  // Update the flight object
+  if (newFlightNumber) {
+    flightData[flightIndex].flightNumber = newFlightNumber.trim();
+  }
+  if (departureTime) {
+    flightData[flightIndex].departureTime = departureTime.trim();
+  }
+  if (arrivalTime) {
+    flightData[flightIndex].arrivalTime = arrivalTime.trim();
+  }
+  if (origin) {
+    flightData[flightIndex].origin = origin.trim();
+  }
+  if (destination) {
+    flightData[flightIndex].destination = destination.trim();
+  }
+  if (price !== undefined) {
+    flightData[flightIndex].price = parseFloat(price);
+  }
+  if (airline) {
+    flightData[flightIndex].airline = airline.trim();
+  }
+  if (availableSeats) {
+    flightData[flightIndex].availableSeats = availableSeats;
+  }
+
+  saveJSON('flights.json', flightData);
+
+  return res.status(200).json({
+    message: 'Flight updated successfully.',
+    flight: flightData[flightIndex]
+  });
+});
+
+/**
+ * ===============================
+ * NEW: DELETE AN EXISTING FLIGHT
+ * ===============================
+ */
+app.delete('/flights/:flightNumber', (req, res) => {
+  const { flightNumber } = req.params;
+  const flightData = loadJSON('flights.json');
+  const flightIndex = flightData.findIndex(f => f.flightNumber === flightNumber);
+
+  if (flightIndex === -1) {
+    return res.status(404).json({ message: 'Flight not found.' });
+  }
+
+  // Remove the flight from the array
+  const deletedFlight = flightData.splice(flightIndex, 1)[0];
+  saveJSON('flights.json', flightData);
+
+  return res.status(200).json({
+    message: 'Flight deleted successfully.',
+    deletedFlight
+  });
+});
 // ------------------------------
 // CUSTOMER: Payment for Booked Flight
 // ------------------------------
