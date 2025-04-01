@@ -11,6 +11,11 @@
       {
         "flightNumber": "E6009",
         "seatNumber": "A1"
+      },
+      "BO1201",
+      {
+        "flightNumber": "BO1201",
+        "seatNumber": "E1"
       }
     ]
   }

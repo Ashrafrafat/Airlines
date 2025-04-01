@@ -258,6 +258,33 @@ async function addLoyaltyProgram() {
     console.error("Error adding loyalty program:", error);
   }
 }
+async function getFlightsWithFilter() {
+  console.log("\n-- Get Flights (Filter by Origin & Destination) --");
+  const origin = await askQuestion("Enter origin (leave blank if none): ");
+  const destination = await askQuestion("Enter destination (leave blank if none): ");
+
+  let url = `${BASE_URL}/flights`;
+  const params = [];
+
+  if (origin.trim()) {
+    params.push(`origin=${encodeURIComponent(origin.trim())}`);
+  }
+  if (destination.trim()) {
+    params.push(`destination=${encodeURIComponent(destination.trim())}`);
+  }
+
+  if (params.length > 0) {
+    url += "?" + params.join("&");
+  }
+
+  try {
+    const response = await fetch(url);
+    const result = await response.json();
+    console.log("Filtered Flights:", result);
+  } catch (error) {
+    console.error("Error fetching flights with filter:", error);
+  }
+}
 // ------------------------------
 // Customer: Book Flight
 // ------------------------------
@@ -353,7 +380,8 @@ async function main() {
     console.log("11. Customer: Book Flight");
     console.log("12. Customer: Provide Payment");
     console.log("13. Customer: Book Seat");
-    console.log("14. Exit");
+    console.log("14. Get Flights with Filter");
+    console.log("15. Exit");
 
     const choice = await askQuestion("Enter your choice: ");
     switch (choice.trim()) {
@@ -397,6 +425,9 @@ async function main() {
         await customerBookSeat();
         break;
       case "14":
+        await getFlightsWithFilter();
+        break;
+      case "15":
         console.log("Exiting...");
         rl.close();
         process.exit(0);

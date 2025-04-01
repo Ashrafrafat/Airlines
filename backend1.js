@@ -163,7 +163,7 @@ app.post('/register', (req, res) => {
 
   // Load customers from JSON file
   const customers = loadJSON('customers.json');
-
+  //Unique Email per User
   // Check if the email is already registered
   if (customers.some(customer => customer.email === email)) {
     return res.status(400).json({ message: 'Email already registered.' });
@@ -329,11 +329,33 @@ app.post('/admin/:adminId/manageLoyaltyPrograms', (req, res) => {
   });
 });
 
-// GET /flights - Retrieve all flights
 app.get('/flights', (req, res) => {
-  const flightData = loadJSON('flights.json');
+  console.log('DEBUG: In GET /flights route'); // Add for debugging
+  console.log('Query params:', req.query);
+
+  const { origin, destination } = req.query;
+  let flightData = loadJSON('flights.json');
+
+  // Filter by origin if 'origin' query param is provided
+  if (origin) {
+    flightData = flightData.filter(flight =>
+      flight.origin.toLowerCase() === origin.toLowerCase().trim()
+    );
+  }
+
+  // Filter by destination if 'destination' query param is provided
+  if (destination) {
+    flightData = flightData.filter(flight =>
+      flight.destination.toLowerCase() === destination.toLowerCase().trim()
+    );
+  }
+
+  // Log how many flights remain after filtering
+  console.log('DEBUG: flightData after filter:', flightData.map(f => f.flightNumber));
   res.json(flightData);
 });
+
+
 
 
 // ----------------------------------------------------------------------
@@ -343,13 +365,13 @@ app.get('/flights', (req, res) => {
 app.post('/flights', (req, res) => {
   const flightData = loadJSON('flights.json');
   const { flightNumber, departureTime, arrivalTime, origin, destination, price, airline, availableSeats } = req.body;
-
+  //•	Unique Flight Numbers
   // Check if the flight number already exists
   const existingFlight = flightData.find(flight => flight.flightNumber === flightNumber);
   if (existingFlight) {
     return res.status(400).json({ message: 'Flight number must be unique. This flight number already exists.' });
   }
-  
+  //Flight Departure Must Be Before Arrival
   // Check if departure is before arrival
   const depTime = new Date(departureTime);
   const arrTime = new Date(arrivalTime);
@@ -359,12 +381,14 @@ app.post('/flights', (req, res) => {
 
   // Validate available seats if provided
   if (availableSeats && Array.isArray(availableSeats)) {
+    //•	No Duplicate Seats in a Flight
     // Check for duplicate seat numbers
     const seatNumbers = availableSeats.map(seat => seat.seatNumber);
     const uniqueSeatNumbers = new Set(seatNumbers);
     if (uniqueSeatNumbers.size !== seatNumbers.length) {
       return res.status(400).json({ message: 'Duplicate seats are not allowed in a flight.' });
     }
+    //•	Occupied or Available Seats
     // Ensure each seat has a valid Boolean for isOccupied (default to false if not)
     availableSeats.forEach(seat => {
       if (typeof seat.isOccupied !== 'boolean') {
@@ -424,12 +448,14 @@ app.post('/customer/:customerId/bookSeat', (req, res) => {
   if (!seat) {
     return res.status(404).json({ message: 'Seat not found in this flight.' });
   }
-
+  //Occupied or Available Seats
   // Check if the seat is already occupied
+  //Seat Cannot Be Occupied More Than Once
   if (seat.isOccupied) {
-    return res.status(400).json({ message: 'Seat is already occupied.' });
+    return res.status(400).json({ message: 'Seat is already occupied.' });//Seats Cannot Be Overbooked
   }
 
+  //Customer Cannot Book the Same Flight Twice
   // Check if the customer has already booked this seat in this flight
   // Assuming customer.bookings is now an array of objects with flightNumber and seatNumber
   const existingBooking = customer.bookings.find(b => b.flightNumber === flightNumber && b.seatNumber === seatNumber);
@@ -491,7 +517,7 @@ app.post('/customer/:customerId/bookFlight', (req, res) => {
   if (!flight) {
     return res.status(404).json({ message: 'Flight not found.' });
   }
-
+  //	Customer Cannot Book the Same Flight Twice
   // Check if the customer has already booked this flight
   if (customer.bookings.includes(flightNumber)) {
     return res.status(400).json({ message: 'You have already booked this flight.' });
@@ -535,12 +561,12 @@ app.post('/customer/:customerId/payment', (req, res) => {
   if (!customer.bookings.includes(flightNumber)) {
     return res.status(400).json({ message: 'You have not booked this flight yet.' });
   }
-
+  //Payment Amount Should Be Equal to Total Flight Costs
   // Validate payment amount
   if (paymentAmount !== flight.price) {
     return res.status(400).json({ message: 'Payment amount must be equal to the total flight cost.' });
   }
-
+//Payment Must Be Associated with A Valid Transaction ID
   // Validate transaction ID (you can add further validation for transaction format or uniqueness if needed)
   if (!transactionId || transactionId.trim() === '') {
     return res.status(400).json({ message: 'Invalid transaction ID.' });

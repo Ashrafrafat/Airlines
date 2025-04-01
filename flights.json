@@ -110,5 +110,26 @@
         "isOccupied": false
       }
     ]
+  },
+  {
+    "flightNumber": "BO1201",
+    "departureTime": "2025-04-01",
+    "arrivalTime": "2025-04-02",
+    "origin": "Toronto",
+    "destination": "Mumbai",
+    "price": 1700,
+    "airline": "Air Canada",
+    "availableSeats": [
+      {
+        "seatNumber": "E1",
+        "class": "Business",
+        "isOccupied": true
+      },
+      {
+        "seatNumber": "E2",
+        "class": "Business",
+        "isOccupied": false
+      }
+    ]
   }
 ]

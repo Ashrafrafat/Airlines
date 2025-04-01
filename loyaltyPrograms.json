@@ -6,5 +6,13 @@
     "tier": "gold",
     "active": true,
     "validTill": "jbjbj"
+  },
+  {
+    "programId": "I0101",
+    "programName": "Premium",
+    "pointsPerDollar": 100,
+    "tier": "Silver",
+    "active": true,
+    "validTill": "2025-04-01"
   }
 ]
