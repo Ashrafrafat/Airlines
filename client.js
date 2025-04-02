@@ -307,14 +307,14 @@ async function customerBookFlight() {
 }
 
 // ------------------------------
-// Customer: Provide Payment
+// Customer: Provide Payment (UPDATED)
 // ------------------------------
 async function customerProvidePayment() {
-  console.log("\n-- Customer: Provide Payment --");
   const customerId = await askQuestion("Enter your Customer ID: ");
   const flightNumber = await askQuestion("Enter flight number you want to pay for: ");
   const paymentAmount = await askQuestion("Enter payment amount (must match flight cost): ");
-  const transactionId = await askQuestion("Enter transaction ID: ");
+  const creditCardNumber = await askQuestion("Enter credit card number (12 digits): ");
+  const cvv = await askQuestion("Enter CVV (3 digits): ");
 
   try {
     const response = await fetch(`${BASE_URL}/customer/${customerId.trim()}/payment`, {
@@ -323,7 +323,8 @@ async function customerProvidePayment() {
       body: JSON.stringify({
         flightNumber: flightNumber.trim(),
         paymentAmount: parseFloat(paymentAmount.trim()),
-        transactionId: transactionId.trim()
+        creditCardNumber: creditCardNumber.trim(),
+        cvv: cvv.trim()
       })
     });
     const result = await response.json();

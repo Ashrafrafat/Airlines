@@ -658,45 +658,67 @@ app.delete('/flights/:flightNumber', (req, res) => {
     deletedFlight
   });
 });
-// ------------------------------
-// CUSTOMER: Payment for Booked Flight
-// ------------------------------
+
 app.post('/customer/:customerId/payment', (req, res) => {
   const { customerId } = req.params;
-  const { flightNumber, paymentAmount, transactionId } = req.body;
+  
+  // We now expect:
+  //   - flightNumber
+  //   - paymentAmount
+  //   - creditCardNumber (12 digits)
+  //   - cvv (3 digits)
+  const { flightNumber, paymentAmount, creditCardNumber, cvv } = req.body;
 
   // Load customers and flights data
   const customers = loadJSON('customers.json');
   const flights = loadJSON('flights.json');
 
-  // Find the customer
+  // 1) Find the customer
   const customer = customers.find(c => c.userId === customerId);
   if (!customer) {
     return res.status(404).json({ message: 'Customer not found.' });
   }
 
-  // Find the flight
+  // 2) Find the flight
   const flight = flights.find(f => f.flightNumber === flightNumber);
   if (!flight) {
     return res.status(404).json({ message: 'Flight not found.' });
   }
 
-  // Check if the customer has already booked the flight
+  // 3) Check booking
   if (!customer.bookings.includes(flightNumber)) {
     return res.status(400).json({ message: 'You have not booked this flight yet.' });
   }
-  //Payment Amount Should Be Equal to Total Flight Costs
-  // Validate payment amount
+
+  // 4) Validate payment amount matches the flight price
   if (paymentAmount !== flight.price) {
-    return res.status(400).json({ message: 'Payment amount must be equal to the total flight cost.' });
-  }
-//Payment Must Be Associated with A Valid Transaction ID
-  // Validate transaction ID (you can add further validation for transaction format or uniqueness if needed)
-  if (!transactionId || transactionId.trim() === '') {
-    return res.status(400).json({ message: 'Invalid transaction ID.' });
+    return res.status(400).json({
+      message: 'Payment amount must be equal to the total flight cost.'
+    });
   }
 
-  // Add payment details to the customer
+  // 5) Validate creditCardNumber (12 digits)
+  if (!creditCardNumber || !/^\d{12}$/.test(creditCardNumber)) {
+    return res.status(400).json({
+      message: 'Invalid credit card number. Must be exactly 12 digits.'
+    });
+  }
+
+  // 6) Validate CVV (3 digits)
+  if (!cvv || !/^\d{3}$/.test(cvv)) {
+    return res.status(400).json({
+      message: 'Invalid CVV. Must be 3 digits.'
+    });
+  }
+
+  // 7) Generate transaction ID automatically
+  function generateTransactionId() {
+    // e.g. "TXN-<timestamp>-<random4digits>"
+    return 'TXN-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+  }
+  const transactionId = generateTransactionId();
+
+  // 8) Add payment details to the customer
   if (!customer.payments) {
     customer.payments = [];
   }
@@ -710,7 +732,7 @@ app.post('/customer/:customerId/payment', (req, res) => {
 
   customer.payments.push(paymentDetails);
 
-  // Save the updated customer data
+  // 9) Save the updated customer data
   saveJSON('customers.json', customers);
 
   return res.status(200).json({
@@ -718,6 +740,7 @@ app.post('/customer/:customerId/payment', (req, res) => {
     paymentDetails,
   });
 });
+
 
 // ----------------------------------------------------------------------
 // Start the Server

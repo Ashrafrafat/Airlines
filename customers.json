@@ -17,6 +17,20 @@
         "flightNumber": "BO1201",
         "seatNumber": "E1"
       }
+    ],
+    "payments": [
+      {
+        "flightNumber": "BO1201",
+        "paymentAmount": 1700,
+        "transactionId": "TXN-1743554086181-2629",
+        "date": "2025-04-02T00:34:46.214Z"
+      },
+      {
+        "flightNumber": "BO1201",
+        "paymentAmount": 1700,
+        "transactionId": "TXN-1743554419952-7340",
+        "date": "2025-04-02T00:40:19.952Z"
+      }
     ]
   }
 ]
