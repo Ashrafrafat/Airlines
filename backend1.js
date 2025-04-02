@@ -741,6 +741,84 @@ app.post('/customer/:customerId/payment', (req, res) => {
   });
 });
 
+/**
+ * ===============================
+ * NEW: CUSTOMER ADDS BAGGAGE
+ * ===============================
+ */
+app.post('/customer/:customerId/addBaggage', (req, res) => {
+  const { customerId } = req.params;
+  const { flightNumber, baggage } = req.body;
+  // 'baggage' can be an array of items or a single object, depending on your needs.
+
+  // Load data
+  const customers = loadJSON('customers.json');
+  const flights = loadJSON('flights.json');
+
+  // 1) Find the customer
+  const customer = customers.find(c => c.userId === customerId);
+  if (!customer) {
+    return res.status(404).json({ message: 'Customer not found.' });
+  }
+
+  // 2) Check that flight exists overall (optional but recommended)
+  const flightExists = flights.some(f => f.flightNumber === flightNumber);
+  if (!flightExists) {
+    return res.status(404).json({ message: 'Flight not found.' });
+  }
+
+  // 3) Find the booking for this flight on the customer
+  //    NOTE: Your code stores flights in different ways:
+  //      - bookFlight: pushes a string flightNumber
+  //      - bookSeat: pushes an object { flightNumber, seatNumber }
+  //    We handle both cases:
+  let bookingIndex = -1;
+  let bookingObj = null;
+
+  customer.bookings.forEach((booking, idx) => {
+    if (typeof booking === 'string' && booking === flightNumber) {
+      bookingIndex = idx;
+      bookingObj = { flightNumber }; // convert to object for storing baggage
+    } else if (typeof booking === 'object' && booking.flightNumber === flightNumber) {
+      bookingIndex = idx;
+      bookingObj = booking;
+    }
+  });
+
+  if (bookingIndex === -1) {
+    return res.status(400).json({ message: 'You have not booked this flight yet.' });
+  }
+
+  // 4) Attach baggage info to this booking
+  //    We'll store an array of baggage items under bookingObj.baggage
+  if (!bookingObj.baggage) {
+    bookingObj.baggage = [];
+  }
+
+  if (Array.isArray(baggage)) {
+    // If user sends an array of items, push them all
+    bookingObj.baggage.push(...baggage);
+  } else if (typeof baggage === 'object') {
+    // If user sends a single baggage object, just push it
+    bookingObj.baggage.push(baggage);
+  } else {
+    return res.status(400).json({
+      message: 'Invalid baggage format. Provide an array or an object.'
+    });
+  }
+
+  // 5) Update the customer's booking in memory
+  customer.bookings[bookingIndex] = bookingObj;
+
+  // 6) Save the updated customers.json
+  saveJSON('customers.json', customers);
+
+  return res.status(200).json({
+    message: 'Baggage added successfully.',
+    booking: bookingObj
+  });
+});
+
 
 // ----------------------------------------------------------------------
 // Start the Server

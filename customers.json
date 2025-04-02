@@ -15,7 +15,17 @@
       "BO1201",
       {
         "flightNumber": "BO1201",
-        "seatNumber": "E1"
+        "seatNumber": "E1",
+        "baggage": [
+          {
+            "type": "Carry-on",
+            "weight": 8
+          },
+          {
+            "type": "Suitcase",
+            "weight": 23
+          }
+        ]
       }
     ],
     "payments": [
