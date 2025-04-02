@@ -112,6 +112,54 @@ class Flight {
   }
 }
 
+// ================ CLASS: Meal ==================
+class Meal {
+  constructor(mealType) {
+    this.mealType = mealType; // e.g., "Vegetarian", "Standard", "Kosher"
+  }
+}
+
+// ================ CLASS: SpecialRequest ==================
+class SpecialRequest {
+  constructor(requestType, note, status = "Pending") {
+    this.requestType = requestType; // e.g. "Wheelchair"
+    this.note = note;               // e.g. "Need assistance boarding"
+    this.status = status;           // "Pending", "Approved", etc.
+  }
+}
+
+// ================ CLASS: Ticket ==================
+class Ticket {
+  constructor(ticketId, boardingPassUrl, bookingRef) {
+    this.ticketId = ticketId;
+    this.boardingPassUrl = boardingPassUrl;
+    // "bookingRef" could be the booking ID or a full Booking object
+    this.bookingRef = bookingRef;
+  }
+}
+
+// ================ CLASS: Booking ==================
+class Booking {
+  constructor(
+    bookingId,
+    flightNumber,
+    seatObj,
+    mealObj,
+    specialRequestObj,
+    ticketObj,
+    bookingDate
+  ) {
+    this.bookingId = bookingId;
+    this.flightNumber = flightNumber;
+    this.seat = seatObj;            // instance of Seat
+    this.meal = mealObj;            // instance of Meal
+    this.specialRequest = specialRequestObj; // instance of SpecialRequest
+    this.ticket = ticketObj;        // instance of Ticket
+    this.bookingDate = bookingDate; // e.g. new Date().toISOString()
+  }
+}
+
+
 // ================ CLASS: LoyaltyProgram ==================
 class LoyaltyProgram {
   constructor(programId, programName, pointsPerDollar, tier, active, validTill) {
@@ -506,22 +554,29 @@ app.post('/loyaltyPrograms', (req, res) => {
 // ------------------------------
 // CUSTOMER: Book a Flight (Expanded)
 // ------------------------------
+// ------------------------------
+// CUSTOMER: Book a Flight (Refactored with Classes)
+// ------------------------------
 app.post('/customer/:customerId/bookFlight', (req, res) => {
   const { customerId } = req.params;
 
-  // We now allow these fields in the request body:
-  // flightNumber (REQUIRED)
-  // seatSelection, mealSelection, baggageSelection, specialRequest (OPTIONAL)
-  // We'll also generate a bookingId and bookingDate automatically.
+  // We’ll expect these fields in the body:
+  // flightNumber (required)
+  // seatNumber, seatClass (optional)
+  // mealType (optional)
+  // specialRequestType, specialRequestNote (optional)
+  // boardingPassUrl (optional)
   const {
     flightNumber,
-    seatSelection,
-    mealSelection,
-    baggageSelection,
-    specialRequest,
+    seatNumber,
+    seatClass,
+    mealType,
+    specialRequestType,
+    specialRequestNote,
+    boardingPassUrl
   } = req.body;
 
-  // Load customers and flights data
+  // Load customers and flights
   const customers = loadJSON('customers.json');
   const flights = loadJSON('flights.json');
 
@@ -537,59 +592,85 @@ app.post('/customer/:customerId/bookFlight', (req, res) => {
     return res.status(404).json({ message: 'Flight not found.' });
   }
 
-  // 3) Prevent booking the same flight multiple times
-  //    Because your code might store a flight in two ways:
-  //      a) as a string, e.g., "BO1201", or
-  //      b) as an object with { flightNumber } 
-  //    We'll check both possibilities:
+  // 3) Check if already booked
   const alreadyBooked = customer.bookings.some(booking => {
-    // If booking is just a string
-    if (typeof booking === 'string') {
-      return booking === flightNumber;
-    }
-    // If booking is an object with flightNumber
-    else if (typeof booking === 'object' && booking.flightNumber === flightNumber) {
+    if (typeof booking === 'object' && booking.flightNumber === flightNumber) {
+      return true;
+    } else if (typeof booking === 'string' && booking === flightNumber) {
       return true;
     }
     return false;
   });
-
   if (alreadyBooked) {
     return res.status(400).json({ message: 'You have already booked this flight.' });
   }
 
-  // 4) Generate a bookingId and bookingDate
+  // 4) Build new class instances
+
+  // Seat object
+  const seatObj = new Seat(seatNumber || "Unassigned", seatClass || "Economy", false);
+
+  // Optional: Mark seat as occupied in flights.json if seatNumber is provided
+  if (seatNumber) {
+    const seatInFlight = flight.availableSeats.find(s => s.seatNumber === seatNumber);
+    if (seatInFlight && !seatInFlight.isOccupied) {
+      seatInFlight.isOccupied = true;
+      saveJSON('flights.json', flights); // persist seat occupancy
+    }
+  }
+
+  // Meal object
+  const mealObj = new Meal(mealType || "Standard");
+
+  // SpecialRequest object
+  let specialRequestObj = null;
+  if (specialRequestType) {
+    specialRequestObj = new SpecialRequest(
+      specialRequestType,
+      specialRequestNote || "",
+      "Pending"
+    );
+  }
+
+  // Generate a new bookingId
   function generateBookingId() {
-    // e.g. "BK-<timestamp>-<random4digits>"
     return 'BK-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
   }
   const bookingId = generateBookingId();
-  const bookingDate = new Date().toISOString(); 
 
-  // 5) Build a new booking object
-  //    Add any extra fields you want, like seatSelection, mealSelection, baggageSelection, specialRequest
-  const newBooking = {
+  // Build a Ticket
+  const ticketId = 'TK-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+  const ticketObj = new Ticket(ticketId, boardingPassUrl || "", null);
+
+  // Create the Booking object
+  const newBooking = new Booking(
     bookingId,
-    bookingDate,
     flightNumber,
-    seatSelection: seatSelection || null,
-    mealSelection: mealSelection || null,
-    baggageSelection: baggageSelection || null,
-    specialRequest: specialRequest || null
-  };
+    seatObj,
+    mealObj,
+    specialRequestObj,
+    ticketObj,
+    new Date().toISOString()
+  );
 
-  // 6) Add the booking to the customer
+  // Link the ticket back to the booking if you wish
+  ticketObj.bookingRef = newBooking.bookingId;
+
+  // 5) Save the booking to the customer's record
+  if (!customer.bookings) {
+    customer.bookings = [];
+  }
   customer.bookings.push(newBooking);
 
-  // 7) Save the updated customer data
+  // 6) Save the updated data
   saveJSON('customers.json', customers);
 
-  return res.status(200).json({
-    message: 'Flight booked successfully.',
-    flight,        // existing flight info
-    booking: newBooking  // show the new booking details
+  return res.status(201).json({
+    message: 'Flight booked successfully with classes.',
+    booking: newBooking
   });
 });
+
 
 
 /**

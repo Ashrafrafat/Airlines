@@ -70,5 +70,26 @@
         "isOccupied": false
       }
     ]
+  },
+  {
+    "flightNumber": "C1011",
+    "departureTime": "2025-04-01T14:30:00",
+    "arrivalTime": "2025-04-03T14:30:00",
+    "origin": "Dhaka",
+    "destination": "Khulna",
+    "price": 100,
+    "airline": "Porter",
+    "availableSeats": [
+      {
+        "seatNumber": "A1",
+        "class": "Economy",
+        "isOccupied": false
+      },
+      {
+        "seatNumber": "Economy",
+        "class": "A3",
+        "isOccupied": false
+      }
+    ]
   }
 ]
