@@ -496,44 +496,94 @@ app.post('/loyaltyPrograms', (req, res) => {
   return res.status(201).json({ message: 'Loyalty program added.', program: req.body });
 });
 // ------------------------------
-// CUSTOMER: Book a Flight
+// ------------------------------
+// CUSTOMER: Book a Flight (Expanded)
 // ------------------------------
 app.post('/customer/:customerId/bookFlight', (req, res) => {
   const { customerId } = req.params;
-  const { flightNumber } = req.body;
+
+  // We now allow these fields in the request body:
+  // flightNumber (REQUIRED)
+  // seatSelection, mealSelection, baggageSelection, specialRequest (OPTIONAL)
+  // We'll also generate a bookingId and bookingDate automatically.
+  const {
+    flightNumber,
+    seatSelection,
+    mealSelection,
+    baggageSelection,
+    specialRequest,
+  } = req.body;
 
   // Load customers and flights data
   const customers = loadJSON('customers.json');
   const flights = loadJSON('flights.json');
 
-  // Find the customer
+  // 1) Find the customer
   const customer = customers.find(c => c.userId === customerId);
   if (!customer) {
     return res.status(404).json({ message: 'Customer not found.' });
   }
 
-  // Find the flight
+  // 2) Find the flight
   const flight = flights.find(f => f.flightNumber === flightNumber);
   if (!flight) {
     return res.status(404).json({ message: 'Flight not found.' });
   }
-  //	Customer Cannot Book the Same Flight Twice
-  // Check if the customer has already booked this flight
-  if (customer.bookings.includes(flightNumber)) {
+
+  // 3) Prevent booking the same flight multiple times
+  //    Because your code might store a flight in two ways:
+  //      a) as a string, e.g., "BO1201", or
+  //      b) as an object with { flightNumber } 
+  //    We'll check both possibilities:
+  const alreadyBooked = customer.bookings.some(booking => {
+    // If booking is just a string
+    if (typeof booking === 'string') {
+      return booking === flightNumber;
+    }
+    // If booking is an object with flightNumber
+    else if (typeof booking === 'object' && booking.flightNumber === flightNumber) {
+      return true;
+    }
+    return false;
+  });
+
+  if (alreadyBooked) {
     return res.status(400).json({ message: 'You have already booked this flight.' });
   }
 
-  // Add the flight to the customer's bookings
-  customer.bookings.push(flightNumber);
-  
-  // Save the updated customer data
+  // 4) Generate a bookingId and bookingDate
+  function generateBookingId() {
+    // e.g. "BK-<timestamp>-<random4digits>"
+    return 'BK-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+  }
+  const bookingId = generateBookingId();
+  const bookingDate = new Date().toISOString(); 
+
+  // 5) Build a new booking object
+  //    Add any extra fields you want, like seatSelection, mealSelection, baggageSelection, specialRequest
+  const newBooking = {
+    bookingId,
+    bookingDate,
+    flightNumber,
+    seatSelection: seatSelection || null,
+    mealSelection: mealSelection || null,
+    baggageSelection: baggageSelection || null,
+    specialRequest: specialRequest || null
+  };
+
+  // 6) Add the booking to the customer
+  customer.bookings.push(newBooking);
+
+  // 7) Save the updated customer data
   saveJSON('customers.json', customers);
 
   return res.status(200).json({
     message: 'Flight booked successfully.',
-    flight,
+    flight,        // existing flight info
+    booking: newBooking  // show the new booking details
   });
 });
+
 
 /**
  * ===============================

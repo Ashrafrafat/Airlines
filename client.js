@@ -286,18 +286,42 @@ async function getFlightsWithFilter() {
   }
 }
 // ------------------------------
-// Customer: Book Flight
+// Customer: Book Flight (UPDATED)
 // ------------------------------
 async function customerBookFlight() {
   console.log("\n-- Customer: Book Flight --");
   const customerId = await askQuestion("Enter your Customer ID: ");
   const flightNumber = await askQuestion("Enter flight number to book: ");
 
+  // Prompt for optional fields
+  const seatSelection = await askQuestion("Enter seat selection (optional): ");
+  const mealSelection = await askQuestion("Enter meal selection (optional): ");
+  const baggageSelection = await askQuestion("Enter baggage selection (optional): ");
+  const specialRequest = await askQuestion("Enter any special request (optional): ");
+
+  // Build the body based on user input
+  const bookingData = {
+    flightNumber: flightNumber.trim()
+  };
+
+  if (seatSelection.trim()) {
+    bookingData.seatSelection = seatSelection.trim();
+  }
+  if (mealSelection.trim()) {
+    bookingData.mealSelection = mealSelection.trim();
+  }
+  if (baggageSelection.trim()) {
+    bookingData.baggageSelection = baggageSelection.trim();
+  }
+  if (specialRequest.trim()) {
+    bookingData.specialRequest = specialRequest.trim();
+  }
+
   try {
     const response = await fetch(`${BASE_URL}/customer/${customerId.trim()}/bookFlight`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ flightNumber: flightNumber.trim() })
+      body: JSON.stringify(bookingData)
     });
     const result = await response.json();
     console.log("Response:", result);
