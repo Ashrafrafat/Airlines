@@ -91,5 +91,36 @@
         "isOccupied": false
       }
     ]
+  },
+  {
+    "flightNumber": "FL009",
+    "departureTime": "2025-06-01T10:00:00",
+    "arrivalTime": "2025-06-01T14:00:00",
+    "origin": "JFK",
+    "destination": "LAX",
+    "price": 300,
+    "airline": "Air Express",
+    "availableSeats": [
+      {
+        "seatNumber": "A1",
+        "class": "Economy",
+        "isOccupied": true
+      },
+      {
+        "seatNumber": "A2",
+        "class": "Economy",
+        "isOccupied": false
+      },
+      {
+        "seatNumber": "A3",
+        "class": "First",
+        "isOccupied": false
+      },
+      {
+        "seatNumber": "A4",
+        "class": "Economy",
+        "isOccupied": false
+      }
+    ]
   }
 ]

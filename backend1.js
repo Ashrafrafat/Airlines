@@ -86,7 +86,8 @@ class Flight {
     this.destination = destination;
     this.price = price;
     this.airline = airline;
-    this.availableSeats = []; // array of Seat objects (if using the Seat class)
+    this.availableSeats = [];
+    this.baggage = []; // array of Seat objects (if using the Seat class)
   }
 
   addSeat(seat) {
@@ -147,7 +148,8 @@ class Booking {
     mealObj,
     specialRequestObj,
     ticketObj,
-    bookingDate
+    bookingDate,
+    baggage
   ) {
     this.bookingId = bookingId;
     this.flightNumber = flightNumber;
@@ -155,7 +157,8 @@ class Booking {
     this.meal = mealObj;            // instance of Meal
     this.specialRequest = specialRequestObj; // instance of SpecialRequest
     this.ticket = ticketObj;        // instance of Ticket
-    this.bookingDate = bookingDate; // e.g. new Date().toISOString()
+    this.bookingDate = bookingDate;
+    this.baggage = baggage; // e.g. new Date().toISOString()
   }
 }
 
@@ -573,7 +576,8 @@ app.post('/customer/:customerId/bookFlight', (req, res) => {
     mealType,
     specialRequestType,
     specialRequestNote,
-    boardingPassUrl
+    boardingPassUrl,
+    baggage
   } = req.body;
 
   // Load customers and flights
@@ -650,7 +654,8 @@ app.post('/customer/:customerId/bookFlight', (req, res) => {
     mealObj,
     specialRequestObj,
     ticketObj,
-    new Date().toISOString()
+    new Date().toISOString(),
+    baggage // Optional baggage info
   );
 
   // Link the ticket back to the booking if you wish
@@ -805,7 +810,7 @@ app.post('/customer/:customerId/payment', (req, res) => {
   //   - paymentAmount
   //   - creditCardNumber (12 digits)
   //   - cvv (3 digits)
-  const { flightNumber, paymentAmount, creditCardNumber, cvv } = req.body;
+  const { flightNumber, paymentAmount, creditCardNumber, cvv, bookingId } = req.body;
 
   // Load customers and flights data
   const customers = loadJSON('customers.json');
