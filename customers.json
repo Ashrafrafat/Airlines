@@ -28,7 +28,40 @@
         ]
       },
       "E6009",
-      "C1011"
+      "C1011",
+      {
+        "bookingId": "BK-1743648023482-2448",
+        "flightNumber": "FL009",
+        "seat": {
+          "seatNumber": "A1",
+          "class": "Economy",
+          "isOccupied": false
+        },
+        "meal": {
+          "mealType": "Halal"
+        },
+        "specialRequest": {
+          "requestType": "Wheel chair",
+          "note": "Need two wheel chairs",
+          "status": "Pending"
+        },
+        "ticket": {
+          "ticketId": "TK-1743648023482-7220",
+          "boardingPassUrl": "",
+          "bookingRef": "BK-1743648023482-2448"
+        },
+        "bookingDate": "2025-04-03T02:40:23.482Z",
+        "baggage": [
+          {
+            "type": "Carry-on",
+            "weight": 8
+          },
+          {
+            "type": "Suitcase",
+            "weight": 23
+          }
+        ]
+      }
     ],
     "payments": [
       {

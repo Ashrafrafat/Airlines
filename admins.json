@@ -6,5 +6,13 @@
     "password": "rafat123",
     "flights": [],
     "loyaltyPrograms": []
+  },
+  {
+    "userId": "admin1743643804838",
+    "name": "riyaz",
+    "email": "riyaz@gmail.com",
+    "password": "riyaz",
+    "flights": [],
+    "loyaltyPrograms": []
   }
 ]
