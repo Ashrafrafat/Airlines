@@ -383,8 +383,358 @@ async function customerBookSeat() {
   }
 }
 
+// ------------------------------
+// Customer: Cancel Booking and Request Refund
+// ------------------------------
+async function customerCancelBooking() {
+  console.log("\n-- Customer: Cancel Booking and Request Refund --");
+  const customerId = await askQuestion("Enter your Customer ID: ");
+  const bookingId = await askQuestion("Enter booking ID to cancel: ");
+  const reason = await askQuestion("Enter reason for cancellation (optional): ");
+  
+  try {
+    const response = await fetch(`${BASE_URL}/customer/${customerId.trim()}/booking/${bookingId.trim()}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reason: reason.trim()
+      })
+    });
+    const result = await response.json();
+    console.log("Response:", result);
+  } catch (error) {
+    console.error("Error cancelling booking:", error);
+  }
+}
 
+// ------------------------------
+// Customer: View and Manage Past Bookings
+// ------------------------------
+async function customerViewBookings() {
+  console.log("\n-- Customer: View and Manage Past Bookings --");
+  const customerId = await askQuestion("Enter your Customer ID: ");
+  
+  // Optional filters
+  console.log("\nFiltering options (leave blank to skip):");
+  const status = await askQuestion("Filter by status (Active/Cancelled): ");
+  const sortBy = await askQuestion("Sort by (date/flight/status): ");
+  
+  // Build query parameters
+  let url = `${BASE_URL}/customer/${customerId.trim()}/bookings`;
+  const params = [];
+  
+  if (status.trim()) {
+    params.push(`status=${encodeURIComponent(status.trim())}`);
+  }
+  
+  if (sortBy.trim()) {
+    params.push(`sortBy=${encodeURIComponent(sortBy.trim())}`);
+  }
+  
+  if (params.length > 0) {
+    url += "?" + params.join("&");
+  }
+  
+  try {
+    console.log(`\nFetching bookings from: ${url}`);
+    console.log("BASE_URL =", BASE_URL);
+    
+    // Print current time for debugging
+    console.log("Request time:", new Date().toISOString());
+    
+    const response = await fetch(url);
+    
+    // Check if the response is OK and contains JSON
+    console.log(`Response status: ${response.status} ${response.statusText}`);
+    console.log("Response headers:", Object.fromEntries([...response.headers.entries()]));
+    
+    if (!response.ok) {
+      console.error(`Server returned error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`Error details: ${errorText}`);
+      
+      console.log("\nTROUBLESHOOTING TIPS:");
+      console.log("1. Make sure the server is running");
+      console.log("2. Check if the endpoint URL is correct");
+      console.log("3. Verify your customer ID exists in the database");
+      console.log("4. Try restarting the server");
+      return;
+    }
+    
+    const result = await response.json();
+    console.log("Response received:", JSON.stringify(result.message));
+    
+    if (result.bookings && result.bookings.length > 0) {
+      console.log("\n===== Your Bookings =====");
+      result.bookings.forEach((booking, index) => {
+        console.log(`\n[Booking ${index + 1}]`);
+        
+        // Display booking ID if available
+        if (booking.bookingId) {
+          console.log(`Booking ID: ${booking.bookingId}`);
+        }
+        
+        console.log(`Flight Number: ${booking.flightNumber}`);
+        console.log(`Status: ${booking.status || 'Active'}`);
+        
+        // Display booking date if available
+        if (booking.bookingDate && booking.bookingDate !== 'Unknown') {
+          console.log(`Booking Date: ${new Date(booking.bookingDate).toLocaleString()}`);
+        }
+        
+        // Display seat information if available
+        if (booking.seat && booking.seat.seatNumber) {
+          console.log(`Seat: ${booking.seat.seatNumber} (${booking.seat.class})`);
+        } else if (booking.seatNumber) {
+          console.log(`Seat: ${booking.seatNumber}`);
+        }
+        
+        // Display flight details if available
+        if (booking.flightDetails) {
+          console.log("\nFlight Details:");
+          console.log(`  ${booking.flightDetails.origin} → ${booking.flightDetails.destination}`);
+          console.log(`  Departure: ${new Date(booking.flightDetails.departureTime).toLocaleString()}`);
+          console.log(`  Arrival: ${new Date(booking.flightDetails.arrivalTime).toLocaleString()}`);
+          console.log(`  Airline: ${booking.flightDetails.airline}`);
+          console.log(`  Price: $${booking.flightDetails.price}`);
+        }
+        
+        // Display cancellation info if booking is cancelled
+        if (booking.status === 'Cancelled' && booking.cancellationDate) {
+          console.log(`\nCancelled on: ${new Date(booking.cancellationDate).toLocaleString()}`);
+        }
+        
+        console.log("------------------------");
+      });
+      
+      // Offer booking management options
+      const manageOption = await askQuestion("\nDo you want to manage a booking? (yes/no): ");
+      if (manageOption.trim().toLowerCase() === 'yes') {
+        const bookingAction = await askQuestion("Enter action (cancel): ");
+        if (bookingAction.trim().toLowerCase() === 'cancel') {
+          await customerCancelBooking();
+        } else {
+          console.log("Invalid action.");
+        }
+      }
+    } else {
+      console.log("No bookings found.");
+    }
+  } catch (error) {
+    console.error("\nERROR DETAILS:");
+    console.error(`Message: ${error.message}`);
+    console.error(`Stack: ${error.stack}`);
+    console.log("\nPlease make sure the server is running and try again.");
+  }
+}
 
+// ------------------------------
+// Customer: Join Loyalty Program
+// ------------------------------
+async function customerJoinLoyaltyProgram() {
+  console.log("\n-- Customer: Join Loyalty Program --");
+  const customerId = await askQuestion("Enter your Customer ID: ");
+  
+  try {
+    const response = await fetch(`${BASE_URL}/customer/${customerId.trim()}/joinLoyaltyProgram`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log("\n=== Loyalty Program Enrollment ===");
+      console.log(`Status: ${result.message}`);
+      console.log(`Current Tier: ${result.loyaltyProgram.level}`);
+      console.log(`Date Joined: ${new Date(result.loyaltyProgram.dateJoined).toLocaleString()}`);
+      console.log(`Points Per Dollar: ${result.loyaltyProgram.pointsPerDollar}`);
+      console.log("\nUpgrade Path:");
+      result.loyaltyProgram.upgradePath.forEach(tier => {
+        console.log(`- ${tier.level}: $${tier.threshold}+ in spending`);
+      });
+    } else {
+      console.log("Response:", result);
+    }
+  } catch (error) {
+    console.error("Error joining loyalty program:", error);
+  }
+}
+
+// ------------------------------
+// Customer: Check Loyalty Status
+// ------------------------------
+async function customerCheckLoyaltyStatus() {
+  console.log("\n-- Customer: Check Loyalty Status --");
+  const customerId = await askQuestion("Enter your Customer ID: ");
+  
+  try {
+    const response = await fetch(`${BASE_URL}/customer/${customerId.trim()}/loyaltyStatus`);
+    const result = await response.json();
+    
+    if (response.ok) {
+      console.log("\n=== Your Loyalty Status ===");
+      console.log(`Current Tier: ${result.loyaltyProgram.level}`);
+      console.log(`Current Points: ${result.loyaltyPoints}`);
+      console.log(`Total Spent: $${result.totalSpent.toFixed(2)}`);
+      console.log(`Earning Rate: ${result.loyaltyProgram.pointsPerDollar} points per dollar`);
+      
+      // Calculate tier progress
+      const currentTier = result.loyaltyProgram.level;
+      const nextTierInfo = getNextTierInfo(currentTier, result.totalSpent);
+      
+      if (nextTierInfo) {
+        const remaining = nextTierInfo.threshold - result.totalSpent;
+        console.log(`\nProgress to ${nextTierInfo.level}: $${remaining.toFixed(2)} more spending needed`);
+        const progressPercent = Math.min(100, Math.floor((result.totalSpent / nextTierInfo.threshold) * 100));
+        console.log(`[${progressBar(progressPercent)}] ${progressPercent}%`);
+      } else {
+        console.log("\nCongratulations! You've reached our highest tier level.");
+      }
+      
+      // Display redemption options
+      console.log("\nAvailable Redemption Options:");
+      console.log("1. Free Flight: 10,000 points = $100 flight credit");
+      console.log("2. Cabin Upgrade: 5,000 points");
+      console.log("3. Lounge Access: 500 points per day");
+      console.log("4. Extra Baggage: 200 points per kg");
+    } else {
+      console.log("Response:", result);
+    }
+  } catch (error) {
+    console.error("Error checking loyalty status:", error);
+  }
+}
+
+// Helper function to get next tier information
+function getNextTierInfo(currentTier, totalSpent) {
+  const tiers = [
+    { level: 'Basic', threshold: 0 },
+    { level: 'Silver', threshold: 1000 },
+    { level: 'Gold', threshold: 1500 },
+    { level: 'Platinum', threshold: 2000 }
+  ];
+  
+  const currentTierIndex = tiers.findIndex(tier => tier.level === currentTier);
+  if (currentTierIndex < tiers.length - 1) {
+    return tiers[currentTierIndex + 1];
+  }
+  return null; // Already at highest tier
+}
+
+// Helper function to create a simple progress bar
+function progressBar(percent) {
+  const width = 20; // characters
+  const completed = Math.floor((percent / 100) * width);
+  return '█'.repeat(completed) + '░'.repeat(width - completed);
+}
+
+// ------------------------------
+// Customer: Redeem Loyalty Points
+// ------------------------------
+async function customerRedeemPoints() {
+  console.log("\n-- Customer: Redeem Loyalty Points --");
+  const customerId = await askQuestion("Enter your Customer ID: ");
+  
+  // First, check current points balance
+  try {
+    const statusResponse = await fetch(`${BASE_URL}/customer/${customerId.trim()}/loyaltyStatus`);
+    const statusResult = await statusResponse.json();
+    
+    if (!statusResponse.ok) {
+      console.log("Error:", statusResult.message);
+      return;
+    }
+    
+    const currentPoints = statusResult.loyaltyPoints || 0;
+    console.log(`\nYou have ${currentPoints} loyalty points available.`);
+    
+    if (currentPoints <= 0) {
+      console.log("You don't have enough points to redeem any rewards.");
+      return;
+    }
+    
+    // Display redemption options
+    console.log("\nRedemption Options:");
+    console.log("1. Free Flight Credit (100 points = $1)");
+    console.log("2. Cabin Upgrade (5,000 points)");
+    console.log("3. Lounge Access (500 points per day)");
+    console.log("4. Extra Baggage (200 points per kg)");
+    
+    const option = await askQuestion("\nSelect an option (1-4): ");
+    let rewardType;
+    let pointsToRedeem;
+    
+    switch (option.trim()) {
+      case "1":
+        rewardType = "freeFlight";
+        pointsToRedeem = await askQuestion(`Enter points to redeem (max ${currentPoints}): `);
+        break;
+      case "2":
+        rewardType = "upgrade";
+        pointsToRedeem = 5000;
+        if (currentPoints < pointsToRedeem) {
+          console.log(`Not enough points. You need ${pointsToRedeem} points for this reward.`);
+          return;
+        }
+        break;
+      case "3":
+        rewardType = "lounge";
+        const days = await askQuestion("Enter number of days for lounge access: ");
+        pointsToRedeem = parseInt(days) * 500;
+        if (currentPoints < pointsToRedeem) {
+          console.log(`Not enough points. You need ${pointsToRedeem} points for ${days} day(s).`);
+          return;
+        }
+        break;
+      case "4":
+        rewardType = "baggage";
+        const kg = await askQuestion("Enter extra baggage in kg: ");
+        pointsToRedeem = parseInt(kg) * 200;
+        if (currentPoints < pointsToRedeem) {
+          console.log(`Not enough points. You need ${pointsToRedeem} points for ${kg}kg.`);
+          return;
+        }
+        break;
+      default:
+        console.log("Invalid option selected.");
+        return;
+    }
+    
+    // Confirm redemption
+    const confirmRedemption = await askQuestion(`\nRedeem ${pointsToRedeem} points for ${rewardType}? (yes/no): `);
+    if (confirmRedemption.trim().toLowerCase() !== "yes") {
+      console.log("Redemption cancelled.");
+      return;
+    }
+    
+    // Process redemption
+    const redeemResponse = await fetch(`${BASE_URL}/customer/${customerId.trim()}/redeemPoints`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pointsToRedeem,
+        rewardType
+      })
+    });
+    const redeemResult = await redeemResponse.json();
+    
+    if (redeemResponse.ok) {
+      console.log("\n=== Redemption Successful ===");
+      console.log(`Reward: ${redeemResult.redemption.rewardValue.type}`);
+      console.log(`Value: ${redeemResult.redemption.rewardValue.value}`);
+      console.log(`Description: ${redeemResult.redemption.rewardValue.description}`);
+      console.log(`Points Used: ${redeemResult.redemption.pointsRedeemed}`);
+      console.log(`Remaining Points: ${redeemResult.remainingPoints}`);
+      console.log(`Status: ${redeemResult.redemption.status}`);
+      console.log(`Redemption ID: ${redeemResult.redemption.redemptionId}`);
+    } else {
+      console.log("Redemption failed:", redeemResult.message);
+    }
+  } catch (error) {
+    console.error("Error redeeming points:", error);
+  }
+}
 
 // ------------------------------
 // Main Interactive Menu
@@ -406,7 +756,12 @@ async function main() {
     console.log("12. Customer: Provide Payment");
     console.log("13. Customer: Book Seat");
     console.log("14. Get Flights with Filter");
-    console.log("15. Exit");
+    console.log("15. Customer: Cancel Booking");
+    console.log("16. Customer: View Bookings");
+    console.log("17. Customer: Join Loyalty Program");
+    console.log("18. Customer: Check Loyalty Status");
+    console.log("19. Customer: Redeem Points");
+    console.log("20. Exit");
 
     const choice = await askQuestion("Enter your choice: ");
     switch (choice.trim()) {
@@ -453,6 +808,21 @@ async function main() {
         await getFlightsWithFilter();
         break;
       case "15":
+        await customerCancelBooking();
+        break;
+      case "16":
+        await customerViewBookings();
+        break;
+      case "17":
+        await customerJoinLoyaltyProgram();
+        break;
+      case "18":
+        await customerCheckLoyaltyStatus();
+        break;
+      case "19":
+        await customerRedeemPoints();
+        break;
+      case "20":
         console.log("Exiting...");
         rl.close();
         process.exit(0);

@@ -104,7 +104,7 @@
       {
         "seatNumber": "A1",
         "class": "Economy",
-        "isOccupied": true
+        "isOccupied": false
       },
       {
         "seatNumber": "A2",

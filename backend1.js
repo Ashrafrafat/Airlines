@@ -387,6 +387,7 @@ app.post('/admin/:adminId/manageLoyaltyPrograms', (req, res) => {
   });
 });
 
+// GET /flights - Get all flights with optional filtering
 app.get('/flights', (req, res) => {
   console.log('DEBUG: In GET /flights route'); // Add for debugging
   console.log('Query params:', req.query);
@@ -413,12 +414,10 @@ app.get('/flights', (req, res) => {
   res.json(flightData);
 });
 
-
-
-
 // ----------------------------------------------------------------------
 // EXAMPLE: Flight and LoyaltyProgram Endpoints (CRUD-like)
 // ----------------------------------------------------------------------
+
 // POST /flights - Add a Flight
 app.post('/flights', (req, res) => {
   const flightData = loadJSON('flights.json');
@@ -563,7 +562,7 @@ app.post('/loyaltyPrograms', (req, res) => {
 app.post('/customer/:customerId/bookFlight', (req, res) => {
   const { customerId } = req.params;
 
-  // We’ll expect these fields in the body:
+  // We'll expect these fields in the body:
   // flightNumber (required)
   // seatNumber, seatClass (optional)
   // mealType (optional)
@@ -875,13 +874,78 @@ app.post('/customer/:customerId/payment', (req, res) => {
 
   customer.payments.push(paymentDetails);
 
-  // 9) Save the updated customer data
+  // 9) Award loyalty points if customer is in loyalty program
+  let loyaltyPointsEarned = 0;
+  let tierUpgraded = false;
+  let newTier = null;
+
+  if (customer.loyaltyProgram) {
+    // Calculate points based on the customer's current pointsPerDollar rate
+    const pointsPerDollar = customer.loyaltyProgram.pointsPerDollar || 1;
+    loyaltyPointsEarned = Math.floor(paymentAmount * pointsPerDollar);
+    
+    // Add points to customer's account
+    if (!customer.loyaltyPoints) {
+      customer.loyaltyPoints = 0;
+    }
+    customer.loyaltyPoints += loyaltyPointsEarned;
+    
+    // Track total spending for tier upgrades
+    if (!customer.totalSpent) {
+      customer.totalSpent = 0;
+    }
+    customer.totalSpent += paymentAmount;
+    
+    // Check if customer should be upgraded to a new tier
+    if (customer.totalSpent >= 2000 && customer.loyaltyProgram.level !== 'Platinum') {
+      customer.loyaltyProgram.level = 'Platinum';
+      customer.loyaltyProgram.pointsPerDollar = 3; // Higher earn rate for platinum
+      customer.loyaltyProgram.lastUpgrade = new Date().toISOString();
+      tierUpgraded = true;
+      newTier = 'Platinum';
+    }
+    else if (customer.totalSpent >= 1500 && customer.loyaltyProgram.level !== 'Gold' 
+            && customer.loyaltyProgram.level !== 'Platinum') {
+      customer.loyaltyProgram.level = 'Gold';
+      customer.loyaltyProgram.pointsPerDollar = 2.5;
+      customer.loyaltyProgram.lastUpgrade = new Date().toISOString();
+      tierUpgraded = true;
+      newTier = 'Gold';
+    }
+    else if (customer.totalSpent >= 1000 && customer.loyaltyProgram.level === 'Basic') {
+      customer.loyaltyProgram.level = 'Silver';
+      customer.loyaltyProgram.pointsPerDollar = 2;
+      customer.loyaltyProgram.lastUpgrade = new Date().toISOString();
+      tierUpgraded = true;
+      newTier = 'Silver';
+    }
+  }
+
+  // 10) Save the updated customer data
   saveJSON('customers.json', customers);
 
-  return res.status(200).json({
+  // 11) Return the response with payment and loyalty information
+  const response = {
     message: 'Payment successful.',
-    paymentDetails,
-  });
+    paymentDetails
+  };
+  
+  // Add loyalty information to the response if relevant
+  if (customer.loyaltyProgram) {
+    response.loyaltyInfo = {
+      pointsEarned: loyaltyPointsEarned,
+      totalPoints: customer.loyaltyPoints,
+      currentTier: customer.loyaltyProgram.level,
+      tierUpgraded
+    };
+    
+    if (tierUpgraded) {
+      response.loyaltyInfo.newTier = newTier;
+      response.loyaltyInfo.message = `Congratulations! You've been upgraded to ${newTier} status.`;
+    }
+  }
+
+  return res.status(200).json(response);
 });
 
 /**
@@ -962,6 +1026,458 @@ app.post('/customer/:customerId/addBaggage', (req, res) => {
   });
 });
 
+/**
+ * ===============================
+ * NEW: CUSTOMER CANCELS BOOKING AND REQUESTS REFUND
+ * ===============================
+ */
+app.post('/customer/:customerId/booking/:bookingId/cancel', (req, res) => {
+  const { customerId, bookingId } = req.params;
+  const { reason } = req.body; // Optional reason for cancellation
+
+  // Load data
+  const customers = loadJSON('customers.json');
+  const flights = loadJSON('flights.json');
+
+  // 1) Find the customer
+  const customer = customers.find(c => c.userId === customerId);
+  if (!customer) {
+    return res.status(404).json({ message: 'Customer not found.' });
+  }
+
+  // 2) Find the booking to cancel
+  let bookingIndex = -1;
+  let bookingToCancel = null;
+
+  // Check different booking formats in our system
+  customer.bookings.forEach((booking, idx) => {
+    // Handle case where booking is an object with bookingId
+    if (typeof booking === 'object' && booking.bookingId === bookingId) {
+      bookingIndex = idx;
+      bookingToCancel = booking;
+    }
+    // Handle legacy bookings that might not have bookingId
+    else if (typeof booking === 'object' && !booking.bookingId && booking.flightNumber === bookingId) {
+      bookingIndex = idx;
+      bookingToCancel = booking;
+    }
+    // Handle case where booking is just a string (flightNumber)
+    else if (typeof booking === 'string' && booking === bookingId) {
+      bookingIndex = idx;
+      bookingToCancel = { flightNumber: booking };
+    }
+  });
+
+  if (bookingIndex === -1) {
+    return res.status(404).json({ message: 'Booking not found.' });
+  }
+
+  // 3) If the booking had a seat, free up the seat in the flight
+  if (bookingToCancel.flightNumber && (bookingToCancel.seatNumber || (bookingToCancel.seat && bookingToCancel.seat.seatNumber))) {
+    const flightIndex = flights.findIndex(f => f.flightNumber === bookingToCancel.flightNumber);
+    
+    if (flightIndex !== -1) {
+      const seatNumber = bookingToCancel.seatNumber || (bookingToCancel.seat && bookingToCancel.seat.seatNumber);
+      
+      if (seatNumber && flights[flightIndex].availableSeats) {
+        const seatIndex = flights[flightIndex].availableSeats.findIndex(
+          s => s.seatNumber === seatNumber
+        );
+        
+        if (seatIndex !== -1) {
+          // Mark the seat as not occupied
+          flights[flightIndex].availableSeats[seatIndex].isOccupied = false;
+          saveJSON('flights.json', flights);
+        }
+      }
+    }
+  }
+
+  // 4) Create a refund record
+  const refundAmount = calculateRefundAmount(bookingToCancel);
+  const refundId = 'REF-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+  
+  const refundRecord = {
+    refundId,
+    bookingId: bookingToCancel.bookingId || bookingId,
+    flightNumber: bookingToCancel.flightNumber,
+    amount: refundAmount,
+    status: 'Pending',
+    requestDate: new Date().toISOString(),
+    reason: reason || 'Customer requested cancellation'
+  };
+
+  // 5) Add refund to customer record
+  if (!customer.refunds) {
+    customer.refunds = [];
+  }
+  customer.refunds.push(refundRecord);
+
+  // 6) Mark booking as cancelled instead of removing it
+  bookingToCancel.status = 'Cancelled';
+  bookingToCancel.cancellationDate = new Date().toISOString();
+  customer.bookings[bookingIndex] = bookingToCancel;
+
+  // 7) Save updated customer data
+  saveJSON('customers.json', customers);
+
+  return res.status(200).json({
+    message: 'Booking cancelled successfully. Refund request submitted.',
+    cancellation: {
+      bookingId: bookingToCancel.bookingId || bookingId,
+      flightNumber: bookingToCancel.flightNumber,
+      cancellationDate: bookingToCancel.cancellationDate
+    },
+    refund: refundRecord
+  });
+});
+
+// Helper function to calculate refund amount based on booking details
+function calculateRefundAmount(booking) {
+  // In a real system, this would implement the business logic for:
+  // - Different refund amounts based on time before flight
+  // - Refund penalties/fees
+  // - Ticket class and airline policies
+  
+  // For this example, we'll assume a flat 80% refund of the payment amount
+  let refundAmount = 0;
+  
+  if (booking.payment && booking.payment.paymentAmount) {
+    refundAmount = booking.payment.paymentAmount * 0.8;
+  } else {
+    // If no payment info in booking, try to look up the flight price
+    const flights = loadJSON('flights.json');
+    const flight = flights.find(f => f.flightNumber === booking.flightNumber);
+    if (flight) {
+      refundAmount = flight.price * 0.8;
+    }
+  }
+  
+  return parseFloat(refundAmount.toFixed(2)); // Return with 2 decimal places
+}
+
+// GET /customer/:customerId/bookings - View and manage bookings
+app.get('/customer/:customerId/bookings', (req, res) => {
+  console.log('DEBUG: In GET /customer/:customerId/bookings route');
+  console.log('URL:', req.url);
+  console.log('Query params:', req.query);
+  
+  const { customerId } = req.params;
+  const { status, sortBy } = req.query;
+
+  try {
+    // Load customer data
+    const customers = loadJSON('customers.json');
+
+    // Find the customer
+    const customer = customers.find(c => c.userId === customerId);
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found.' });
+    }
+
+    // Check if the customer has any bookings
+    if (!customer.bookings || customer.bookings.length === 0) {
+      return res.status(200).json({ 
+        message: 'No bookings found for this customer.',
+        bookings: [] 
+      });
+    }
+
+    // Process bookings for display
+    let bookings = customer.bookings.map(booking => {
+      // Handle different booking formats in our system
+      if (typeof booking === 'string') {
+        // Legacy format where booking is just a flight number string
+        return {
+          flightNumber: booking,
+          status: 'Active', // Default status for legacy bookings
+          bookingDate: 'Unknown'
+        };
+      } else {
+        // Modern format where booking is an object
+        return booking;
+      }
+    });
+
+    // Filter by status if provided
+    if (status) {
+      const statusLower = status.toLowerCase();
+      bookings = bookings.filter(booking => {
+        if (!booking.status) return statusLower === 'active'; // Assume active if no status
+        return booking.status.toLowerCase() === statusLower;
+      });
+    }
+
+    // Sort bookings if sortBy parameter is provided
+    if (sortBy) {
+      switch(sortBy.toLowerCase()) {
+        case 'date':
+          // Sort by booking date (newest first)
+          bookings.sort((a, b) => {
+            const dateA = a.bookingDate ? new Date(a.bookingDate) : new Date(0);
+            const dateB = b.bookingDate ? new Date(b.bookingDate) : new Date(0);
+            return dateB - dateA;
+          });
+          break;
+        case 'flight':
+          // Sort by flight number
+          bookings.sort((a, b) => {
+            if (!a.flightNumber) return 1;
+            if (!b.flightNumber) return -1;
+            return a.flightNumber.localeCompare(b.flightNumber);
+          });
+          break;
+        case 'status':
+          // Sort by status (Active first, then Cancelled)
+          bookings.sort((a, b) => {
+            const statusA = a.status || 'Active';
+            const statusB = b.status || 'Active';
+            return statusA.localeCompare(statusB);
+          });
+          break;
+      }
+    }
+
+    // Return bookings with flight details if available
+    const flights = loadJSON('flights.json');
+    
+    // Enrich booking data with flight details
+    const enrichedBookings = bookings.map(booking => {
+      const flightNumber = booking.flightNumber;
+      if (flightNumber) {
+        const flightDetails = flights.find(f => f.flightNumber === flightNumber);
+        if (flightDetails) {
+          return {
+            ...booking,
+            flightDetails: {
+              origin: flightDetails.origin,
+              destination: flightDetails.destination,
+              departureTime: flightDetails.departureTime,
+              arrivalTime: flightDetails.arrivalTime,
+              airline: flightDetails.airline,
+              price: flightDetails.price
+            }
+          };
+        }
+      }
+      return booking;
+    });
+
+    return res.status(200).json({
+      message: 'Retrieved bookings successfully.',
+      bookings: enrichedBookings
+    });
+  } catch (error) {
+    console.error('Error retrieving bookings:', error);
+    return res.status(500).json({ 
+      message: 'Error retrieving bookings',
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * ===============================
+ * NEW: CUSTOMER JOINS LOYALTY PROGRAM
+ * ===============================
+ */
+app.post('/customer/:customerId/joinLoyaltyProgram', (req, res) => {
+  const { customerId } = req.params;
+  
+  // Load customer data
+  const customers = loadJSON('customers.json');
+  
+  // Find the customer
+  const customer = customers.find(c => c.userId === customerId);
+  if (!customer) {
+    return res.status(404).json({ message: 'Customer not found.' });
+  }
+  
+  // Check if customer already has a loyalty program
+  if (customer.loyaltyProgram) {
+    return res.status(400).json({ 
+      message: 'You are already enrolled in a loyalty program.',
+      program: customer.loyaltyProgram
+    });
+  }
+  
+  // Set up initial loyalty program (Basic level)
+  customer.loyaltyProgram = {
+    level: 'Basic',
+    dateJoined: new Date().toISOString(),
+    pointsPerDollar: 1,
+    statusMiles: 0,
+    upgradePath: [
+      { level: 'Basic', threshold: 0 },
+      { level: 'Silver', threshold: 1000 },
+      { level: 'Gold', threshold: 1500 },
+      { level: 'Platinum', threshold: 2000 }
+    ]
+  };
+
+  // Initialize loyalty points if not already there
+  if (!customer.loyaltyPoints) {
+    customer.loyaltyPoints = 0;
+  }
+  
+  // Save the updated customer data
+  saveJSON('customers.json', customers);
+  
+  return res.status(200).json({
+    message: 'Successfully joined the loyalty program.',
+    loyaltyProgram: customer.loyaltyProgram
+  });
+});
+
+/**
+ * ===============================
+ * NEW: GET CUSTOMER LOYALTY STATUS
+ * ===============================
+ */
+app.get('/customer/:customerId/loyaltyStatus', (req, res) => {
+  const { customerId } = req.params;
+  
+  // Load customer data
+  const customers = loadJSON('customers.json');
+  
+  // Find the customer
+  const customer = customers.find(c => c.userId === customerId);
+  if (!customer) {
+    return res.status(404).json({ message: 'Customer not found.' });
+  }
+  
+  // Check if customer has joined a loyalty program
+  if (!customer.loyaltyProgram) {
+    return res.status(404).json({ 
+      message: 'You are not enrolled in a loyalty program.',
+      loyaltyPoints: customer.loyaltyPoints || 0
+    });
+  }
+  
+  // Return the loyalty status
+  return res.status(200).json({
+    message: 'Loyalty status retrieved successfully.',
+    loyaltyProgram: customer.loyaltyProgram,
+    loyaltyPoints: customer.loyaltyPoints || 0,
+    totalSpent: customer.totalSpent || 0
+  });
+});
+
+/**
+ * ===============================
+ * NEW: REDEEM LOYALTY POINTS
+ * ===============================
+ */
+app.post('/customer/:customerId/redeemPoints', (req, res) => {
+  const { customerId } = req.params;
+  const { pointsToRedeem, rewardType } = req.body;
+  
+  if (!pointsToRedeem || !rewardType) {
+    return res.status(400).json({ 
+      message: 'Missing required fields: pointsToRedeem and rewardType are required.' 
+    });
+  }
+
+  // Validate pointsToRedeem is a positive number
+  const points = parseInt(pointsToRedeem);
+  if (isNaN(points) || points <= 0) {
+    return res.status(400).json({ 
+      message: 'Points to redeem must be a positive number.' 
+    });
+  }
+  
+  // Load customers data
+  const customers = loadJSON('customers.json');
+  
+  // Find the customer
+  const customer = customers.find(c => c.userId === customerId);
+  if (!customer) {
+    return res.status(404).json({ message: 'Customer not found.' });
+  }
+  
+  // Check if customer has enough points
+  if (!customer.loyaltyPoints || customer.loyaltyPoints < points) {
+    return res.status(400).json({ 
+      message: 'Insufficient loyalty points for redemption.',
+      availablePoints: customer.loyaltyPoints || 0,
+      requestedPoints: points
+    });
+  }
+  
+  // Get reward values based on type
+  const rewardValue = calculateRewardValue(rewardType, points);
+  if (!rewardValue) {
+    return res.status(400).json({ 
+      message: 'Invalid reward type. Valid types include: freeFlight, upgrade, lounge, baggage'
+    });
+  }
+  
+  // Create a new redemption record
+  const redemptionId = 'RDM-' + Date.now() + '-' + Math.floor(1000 + Math.random() * 9000);
+  const redemption = {
+    redemptionId,
+    date: new Date().toISOString(),
+    pointsRedeemed: points,
+    rewardType,
+    rewardValue,
+    status: 'Processed'
+  };
+  
+  // Save the redemption to customer record
+  if (!customer.redemptions) {
+    customer.redemptions = [];
+  }
+  customer.redemptions.push(redemption);
+  
+  // Deduct the points
+  customer.loyaltyPoints -= points;
+  
+  // Save the updated customer data
+  saveJSON('customers.json', customers);
+  
+  return res.status(200).json({
+    message: 'Points redeemed successfully.',
+    redemption,
+    remainingPoints: customer.loyaltyPoints
+  });
+});
+
+// Helper function to calculate reward value based on points and type
+function calculateRewardValue(rewardType, points) {
+  switch (rewardType.toLowerCase()) {
+    case 'freeflight':
+      // Calculate flight value (e.g., 10,000 points = $100 flight)
+      return {
+        type: 'Flight Credit',
+        value: `$${Math.floor(points / 100)}`,
+        description: 'Can be applied to any flight purchase'
+      };
+    case 'upgrade':
+      // Cabin upgrade
+      return {
+        type: 'Cabin Upgrade',
+        value: 'One Cabin Class',
+        description: 'Upgrade one cabin class on an existing booking'
+      };
+    case 'lounge':
+      // Lounge access
+      const days = Math.floor(points / 500);
+      return {
+        type: 'Lounge Access',
+        value: `${days} day${days > 1 ? 's' : ''}`,
+        description: 'Access to airport lounges'
+      };
+    case 'baggage':
+      // Extra baggage
+      return {
+        type: 'Extra Baggage',
+        value: `${Math.floor(points / 200)}kg`,
+        description: 'Additional baggage allowance on your next flight'
+      };
+    default:
+      return null;
+  }
+}
 
 // ----------------------------------------------------------------------
 // Start the Server

@@ -5,7 +5,30 @@
     "email": "rafat@concordia.com",
     "password": "rafat123",
     "loyaltyPoints": 0,
-    "loyaltyProgram": null,
+    "loyaltyProgram": {
+      "level": "Basic",
+      "dateJoined": "2025-04-17T03:18:16.109Z",
+      "pointsPerDollar": 1,
+      "statusMiles": 0,
+      "upgradePath": [
+        {
+          "level": "Basic",
+          "threshold": 0
+        },
+        {
+          "level": "Silver",
+          "threshold": 1000
+        },
+        {
+          "level": "Gold",
+          "threshold": 1500
+        },
+        {
+          "level": "Platinum",
+          "threshold": 2000
+        }
+      ]
+    },
     "bookings": [
       "FL001",
       {
@@ -17,6 +40,14 @@
         "flightNumber": "BO1201",
         "seatNumber": "E1",
         "baggage": [
+          {
+            "type": "Carry-on",
+            "weight": 8
+          },
+          {
+            "type": "Suitcase",
+            "weight": 23
+          },
           {
             "type": "Carry-on",
             "weight": 8
@@ -60,7 +91,9 @@
             "type": "Suitcase",
             "weight": 23
           }
-        ]
+        ],
+        "status": "Cancelled",
+        "cancellationDate": "2025-04-17T02:53:40.000Z"
       }
     ],
     "payments": [
@@ -75,6 +108,17 @@
         "paymentAmount": 1700,
         "transactionId": "TXN-1743554419952-7340",
         "date": "2025-04-02T00:40:19.952Z"
+      }
+    ],
+    "refunds": [
+      {
+        "refundId": "REF-1744858419999-7778",
+        "bookingId": "BK-1743648023482-2448",
+        "flightNumber": "FL009",
+        "amount": 240,
+        "status": "Pending",
+        "requestDate": "2025-04-17T02:53:39.999Z",
+        "reason": "I have personal issue"
       }
     ]
   }
